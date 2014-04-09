@@ -14,16 +14,56 @@ public class TCPClient extends ClientBase implements RemoteControllable {
 	public TCPClient()
 	{
 		// initialise the network
-		network = NetworkWrapper.getConnection("localhost", 8124);
-		network.setPrintRequests(true);
-		network.setPrintResponses(true);
+		String host = "localhost";
+		int port = 8124;
+		setUpConnectionServer(host, port, NetworkWrapper.getConnection(host, port));
+	}
+
+	public TCPClient(NetworkWrapper network) {
+		setUpConnectionServer("localhost", 8124, network);
+	}
+
+	private void setUpConnectionServer(String host, int port, NetworkWrapper network) {
 		if(network == null) 
 		{
 			TextOutput.printError("Couldn't establish Connection with server\n");
 			System.exit(1);
+		} else {
+			network.setPrintRequests(true);
+			network.setPrintResponses(true);
+			this.network = network;
+		}
+	}
+	
+	public static void main(String[] args) {
+		if (args.length > 0) {
+			if (args[0].equals("test")) {
+				TextOutput.setDebugMode(true);
+				TCPClient client = new TCPClient();
+				client.tests();
+			}
 		}
 	}
 
+	private void tests() {
+		testConnectToServer();
+		List<Integer> players = testJoinGame(); 
+	}
+
+	private List<Integer> testJoinGame() {
+		List<Integer> players = joinServerGame();
+		if (players == null) {
+			TextOutput.printError("No players returned from server");
+		}
+		return players;
+	}
+
+	private void testConnectToServer() {
+		int numDetectives = 4;
+		int filesId = 1;
+		boolean success = initialiseServerGame("Test session", numDetectives, filesId);
+		if (!success) TextOutput.printError("Game not initialised");
+	}
 
 	/**
 	 * Function to tell the server to reset itself
@@ -58,18 +98,22 @@ public class TCPClient extends ClientBase implements RemoteControllable {
 			List<Integer> players = response.subList(2, response.size());
 			return players;
 		}
-		else return null;
+		return null;
 	}
 
 	private List<Integer> splitStringAndParseToIntegerList(String stringResponse) {
 		if (stringResponse.equals("")) {
 			return null;
 		} 
-		String[] splitResponse = stringResponse.split(",");
+		String[] splitResponse = stringResponse.split("[,:]");
 		List<Integer> response = new ArrayList<>();
 
 		for (String element : splitResponse) {
+			try {
 			response.add(Integer.parseInt(element));
+			} catch (NumberFormatException e) {
+				TextOutput.printDebug("Could not format: " + element + " to Integer");
+			}
 		}
 		return response;
 	}
@@ -129,6 +173,8 @@ public class TCPClient extends ClientBase implements RemoteControllable {
 
 	private List<Integer> sendMessageToServer(String call) {
 		String result = network.send(call);
+		TextOutput.printDebug("[CALL]: " + call);
+		TextOutput.printDebug("[RESULT]: " + result);
 		List<Integer> response = splitStringAndParseToIntegerList(result);
 		return response;
 	}
