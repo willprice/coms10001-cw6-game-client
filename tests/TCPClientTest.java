@@ -1,9 +1,11 @@
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
-import java.net.Socket;
+import java.awt.font.NumericShaper;
 import java.util.Arrays;
 import java.util.List;
+
+import javax.swing.tree.ExpandVetoException;
 
 import static junitparams.JUnitParamsRunner.*;
 import junitparams.JUnitParamsRunner;
@@ -45,28 +47,35 @@ public class TCPClientTest {
 		String validResponse = gameHasBeenJoined + "," + players;
 
 		return $(
-				 $(Arrays.asList(3,4,5), validResponse),
-				 $(null, gameIsUninitializedResponse),
-				 $(null, gameIsAlreadyRunningResponse)
+				$(Arrays.asList(3,4,5), validResponse),
+				$(null, gameIsUninitializedResponse),
+				$(null, gameIsAlreadyRunningResponse)
 				);
 	}
-	
+
 	@Test
-	@Parameters(method = "resetTests")
-	public void reset(boolean expectedResponse, String stubbedResponse) throws Exception {
-		String call = "reset";
+	@Parameters(method = "moveTests")
+	public void move(boolean expectedResponse, String stubbedResponse) throws Exception {
+		int playerId = 1;
+		int targetLocation = 2;
+		Initialisable.TicketType ticket = Initialisable.TicketType.Taxi;
+		String call = "move," + playerId + "," + targetLocation + "," + ticket;
 
 		when(network.send(call)).thenReturn(stubbedResponse);
-		assertEquals(expectedResponse, client.resetServerGame());
+		boolean response = client.makeServerMove(playerId, targetLocation, ticket);
 		verify(network).send(call);
+		assertEquals(expectedResponse, response);
 	}
-	
-	private Object[] resetTests() {
-		String succesfulReset = "1,1";
-		String gameIsIdleAndDoesNotNeedToBeReset = "1,0";
+
+	@SuppressWarnings("unused")
+	private Object[] moveTests() {
+		String succesfulMove = "1,1";
+		String invalidMove = "1,0";
+		String gameIsNotRunning = "1,-1";
 		return $(
-				$(true, succesfulReset),
-				$(false, gameIsIdleAndDoesNotNeedToBeReset)
+				$(true, succesfulMove),
+				$(false, invalidMove),
+				$(false, gameIsNotRunning)
 				);
 	}
 
@@ -77,9 +86,9 @@ public class TCPClientTest {
 		when(network.send(call)).thenReturn(stubbedResponse);
 		assertEquals(expectedResponse, client.getServerNextPlayer());
 		verify(network).send(call);
-		
+
 	}
-	
+
 	@SuppressWarnings("unused")
 	private Object[] nextPlayerTests() {
 		int no_player = 0;
@@ -94,5 +103,75 @@ public class TCPClientTest {
 				$(nextPlayer, gameWithNextPlayerResponse)
 				);
 	}
+
+	@Test
+	@Parameters(method = "winningPlayerTests")
+	public void winningPlayer(int expectedWinningPlayer, String stubbedResponse) throws Exception {
+		String call = "winning_player";
+		when(network.send(call)).thenReturn(stubbedResponse);
+		int actualWinningPlayer = client.getServerWinningPlayer();
+		verify(network).send(call);
+		assertEquals(expectedWinningPlayer, actualWinningPlayer);
+	}
+	
+	@SuppressWarnings("unused")
+	private Object[] winningPlayerTests() {
+		int no_player = 0;
+		int playerId = 1;
+		String gameOverResponse = "1,1";
+		String gameIsNotOverResponse = "1,0";
+		return $(
+				$(playerId, gameOverResponse + "," + playerId),
+				$(no_player, gameIsNotOverResponse)
+				);
+	}
+
+	@Test
+	@Parameters(method = "resetTests")
+	public void reset(boolean expectedResponse, String stubbedResponse) throws Exception {
+		String call = "reset";
+
+		when(network.send(call)).thenReturn(stubbedResponse);
+		assertEquals(expectedResponse, client.resetServerGame());
+		verify(network).send(call);
+	}
+
+	@SuppressWarnings("unused")
+	private Object[] resetTests() {
+		String succesfulReset = "1,1";
+		String gameIsIdleAndDoesNotNeedToBeReset = "1,0";
+		return $(
+				$(true, succesfulReset),
+				$(false, gameIsIdleAndDoesNotNeedToBeReset)
+				);
+	}
+	
+	
+	@Test
+	@Parameters(method = "initialiseGameTests")
+	public void initialiseGame(int numberOfDetectives, String session, int filesId, boolean expectedResponse, String stubbedResponse) throws Exception {
+		String call = "initialise," + numberOfDetectives + "," + session + "," + filesId;
+		when(network.send(call)).thenReturn(stubbedResponse);
+		boolean actualResponse = client.initialiseServerGame(session, numberOfDetectives, filesId);
+		assertEquals(expectedResponse, actualResponse);
+	}
+	
+	@SuppressWarnings("unused")
+	private Object[] initialiseGameTests() {
+		String testSession = "test_session";
+		int exampleFilesId = 1;
+		String gameInitialisedOK = "1,1";
+		String gameIsAlreadyInitialised = "1,0";
+		String gameIsInProgressAndCantBeInitialised = "1,-2";
+		String gameIsInProcessOfInitialisation = "1,-1";
+
+		return $(
+				$(5, testSession, exampleFilesId, true, gameInitialisedOK),
+				$(5, testSession, exampleFilesId, true, gameIsInProcessOfInitialisation),
+				$(5, testSession, exampleFilesId, false, gameIsAlreadyInitialised),
+				$(5, testSession, exampleFilesId, true, gameIsInProgressAndCantBeInitialised)
+				);
+	}
+
 
 }
